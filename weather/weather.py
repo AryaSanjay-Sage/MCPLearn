@@ -1,8 +1,22 @@
+#SERVER NOTES
 #MCP acts as a wrapper around different functionalities. Here, the MCP is acting as a wrapper around the NWS API. 
 #What are some different things MCP can do?
 ##Tools: Functions/actions the server can perform, and they have names/descriptions/parameters which make them usable by an LLM. In this server, get_alerts and get_forecast are the tools
 ##Resources: File-like data clients can read, like API responses, file contents, logs
 ##Prompts: Templates that help users accomplish tasks. Basically a guide for LLMs on HOW to use these tools/resources above
+
+#CLIENT NOTES
+#Component (in this case Claude for Desktop) which knows how to speak MCP protocol, intermediary btwn LLM and MCP servers
+#AI model tells MCP what tool/resource/parameters -> MCP client sends request to server -> gets responses, passes back to AI model
+##IMPORTANT: LLM never directly calls ext APIs or services, tells MCP client, MCP client handles execution through server
+###What does MCP client handle? Lifestyle w servers (init, msge exchange, termination), protocol neg (what features supported), and security boundaries
+
+#HOST NOTES
+#ai application user interacts with (claude desktop). In our case, it'll be the web app/or application within excel
+#Contains/manages 1+ MCP clients
+#Interprets user requests, decides with LLM help which MCP server capability is needed, and tells MCP client to make the call
+
+#COMM FLOW: User input -> host & llm processing -> client request -> server execution -> server response -> client to host/llm -> llm makes response -> user display to user
 
 from typing import Any # Lets you make a var or function of any type
 import httpx # Third-party python library which makes HTTP reqs
