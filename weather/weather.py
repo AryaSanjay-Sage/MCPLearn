@@ -99,66 +99,48 @@ async def get_alerts(state:str) -> str:
     return "\n---\n".join(alerts) #new line, three hypens, new line - makes separation btwn diff alerts when being read by llm/displayed to user
     ##combines individually formatted alert strings into one cohesive formatting string. final string w all formatted alerts is given to mcp client
 
-
-
-
-
-#Coded
-
-# @mcp.tool()
-# async def get_alerts(state: str) -> str:
-#     """Get weather alerts for a US state.
-
-#     Args:
-#         state: Two-letter US state code (e.g. CA, NY)
-#     """
-#     url = f"{NWS_API_BASE}/alerts/active/area/{state}"
-#     data = await make_nws_request(url)
-
-#     if not data or "features" not in data:
-#         return "Unable to fetch alerts or no alerts found."
-
-#     if not data["features"]:
-#         return "No active alerts for this state."
-
-#     alerts = [format_alert(feature) for feature in data["features"]]
-#     return "\n---\n".join(alerts)
-
+#get_forecast is another tool provided by MCP server, main purpose is to get a request from mcp client (llm triggered) asking for weather forecast for a specific geographic location, 
+#identified by latitude and longitude. Gets forecast from NWS API by querying points enpoint (forecast grid metadata for that location including URL), uses that URL to get detailed forecast data
+#handles errors at all api interaction steps, puts forecast periods into readable strings, combines into one string to return to mcp client/llm
 @mcp.tool()
-async def get_forecast(latitude: float, longitude: float) -> str:
-    """Get weather forecast for a location.
-
+async def get_forecast(latitude: float, longitude:float) -> str: #remember that given thsi info, fastmcp auto generates schema (name, description, param, return type) from fctn signature and docstring
+    #^async performs network I/O, calling make_nws_request. add i/o notes to doc fs
+    """Get a location's weather forecast
     Args:
-        latitude: Latitude of the location
-        longitude: Longitude of the location
+        latitude: Location's latitude
+        longitude: Location's longitude
     """
-    # First get the forecast grid endpoint
-    points_url = f"{NWS_API_BASE}/points/{latitude},{longitude}"
+    #1st NWS API call getting gridpoint information
+    #/points/{latitude},{longitude} from https://www.weather.gov/documentation/services-web-api#/ GET section
+    points_url = f"{NWS_API_BASE}/points/{latitude}, {longitude}"
     points_data = await make_nws_request(points_url)
 
+    #remember to do error handling for each api call
     if not points_data:
-        return "Unable to fetch forecast data for this location."
-
-    # Get the forecast URL from the points response
-    forecast_url = points_data["properties"]["forecast"]
-    forecast_data = await make_nws_request(forecast_url)
-
+        return "Cannot get forecast data for this location" #initial step of getting forecast data
+    
+    #2nd NWS API call getting detailed forecast
+    forecast_url = points_data["properties"]["forecast"] #from the initial points url request where it alr has lat long, now it looks for properties and forecast
+    #I see properties in the schema, but not forecast - find where they got that from
+    forecast_data = await make_nws_request(forecast_url) #pausing execution again for network request
     if not forecast_data:
-        return "Unable to fetch detailed forecast."
+        return "Cannot get detailed forecast :("
 
-    # Format the periods into a readable forecast
+    #Forecast_dict has a properties key, inside has a key "periods" w list of all dictionaries which each represent a forecast period
     periods = forecast_data["properties"]["periods"]
-    forecasts = []
-    for period in periods[:5]:  # Only show next 5 periods
+    forecast = []
+    for period in periods[:5]: #only shows next 5 periods - limits llm context size by only processing first 5 periods from the list
         forecast = f"""
-{period['name']}:
-Temperature: {period['temperature']}°{period['temperatureUnit']}
-Wind: {period['windSpeed']} {period['windDirection']}
-Forecast: {period['detailedForecast']}
-"""
-        forecasts.append(forecast)
+    {period['name']}:
+    Temperature: {period['temperature']}°{period['temperatureUnit']}
+    Wind: {period['windSpeed']} {period['windDirection']}
+    Forecast: {period['detailedForecast']}
+    """ #extracts the name of the period, temp, temp unit, wind speed, wind direction, and full narrative forecast
+        forecast.append(forecast) #formats string for the current period and adds to forecast list
 
-    return "\n---\n".join(forecasts)
+    return "\n---\n".join(forecast) #takes list of individual forecast strings (forecast), joins them, combines string to send to mcp client and then llm
+
+#Coded
 
 if __name__ == "__main__":
     # Initialize and run the server
