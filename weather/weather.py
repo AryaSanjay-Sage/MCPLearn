@@ -1,3 +1,9 @@
+#MCP acts as a wrapper around different functionalities. Here, the MCP is acting as a wrapper around the NWS API. 
+#What are some different things MCP can do?
+##Tools: Functions/actions the server can perform, and they have names/descriptions/parameters which make them usable by an LLM. In this server, get_alerts and get_forecast are the tools
+##Resources: File-like data clients can read, like API responses, file contents, logs
+##Prompts: Templates that help users accomplish tasks. Basically a guide for LLMs on HOW to use these tools/resources above
+
 from typing import Any # Lets you make a var or function of any type
 import httpx # Third-party python library which makes HTTP reqs
 from mcp.server.fastmcp import FastMCP # mcp is a package from the MCP SDK, gets the server subpackage, and imports FastMap class from the  SDK 
@@ -29,6 +35,13 @@ async def make_nws_request(url: str) -> dict[str, Any] | None:
             return None #If there's any exception within the try block, jump execution here. the function returns none, so request didn't get valid date
             # None return value is checked by calling functions (get_alerts, get_forecast to see if they got data or need to return an error message)
 
+
+
+
+
+
+
+#CODED
 def format_alert(feature: dict) -> str:
     """Format an alert feature into a readable string."""
     props = feature["properties"]
