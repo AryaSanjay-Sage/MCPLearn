@@ -118,10 +118,16 @@ async def get_forecast(latitude: float, longitude:float) -> str: #remember that 
     #remember to do error handling for each api call
     if not points_data:
         return "Cannot get forecast data for this location" #initial step of getting forecast data
-    
+    #They didn't have a "features" not in data part here like they did for alerts
+    ##bc alerts returns a geojson featurecollection, which has top level key called "features" by default which has a list of individual alert features
+    ##nws api returns object with features key, but its value is an empty list even if no active alerts
+    ###therefore, important to check if features not in data - would be an unexpected response which doesn't include the expected geojson feaatures key
+    #on the other side, points api returns a single geojson feature directly
+
     #2nd NWS API call getting detailed forecast
     forecast_url = points_data["properties"]["forecast"] #from the initial points url request where it alr has lat long, now it looks for properties and forecast
     #I see properties in the schema, but not forecast - find where they got that from
+    #https://api.weather.gov/gridpoints/FFC/80,50/forecast - can see properties in more detail here!
     forecast_data = await make_nws_request(forecast_url) #pausing execution again for network request
     if not forecast_data:
         return "Cannot get detailed forecast :("
