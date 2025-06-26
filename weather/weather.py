@@ -1,3 +1,5 @@
+#Following tutorial: https://modelcontextprotocol.io/quickstart/server
+
 #SERVER NOTES
 #MCP acts as a wrapper around different functionalities. Here, the MCP is acting as a wrapper around the NWS API. 
 #What are some different things MCP can do?
@@ -23,6 +25,8 @@ import httpx # Third-party python library which makes HTTP reqs
 from mcp.server.fastmcp import FastMCP # mcp is a package from the MCP SDK, gets the server subpackage, and imports FastMap class from the  SDK 
 # define FastMCP server
 mcp = FastMCP("weather") #passing name of mcp server (so client called claude will use "weather" as key to launch the server)
+##automatically generates "structured tool definition," which is an MCP concept represented in JSON schema-like format
+
 # constants (all caps)
 NWS_API_BASE = "https://api.weather.gov" # this is the base url for the nws api, which will let us append different apths to get full api endpoint urls. For Sage, switch api to rest/excel one?
 USER_AGENT = "weather-app/1.0" # header which identifies the client making the server request, lets api providers know what applctns accessing services/enforce rate limits
@@ -69,40 +73,56 @@ Instructions: {props.get('instruction', 'No specific instructions provided')}
 #Is there a way to see where the API has missing/inconsistent information or go into the schema? Research later - maybe some sql stuff could be useful in case one of the features/parameters
 #have a lot of missing data - potential optimization?
 
+@mcp.tool() #when FastMCP server starts from mcp.run() call, goes throguh functions marked with this so FastMCP knows that get_alerts is a fctn to expose to mcp client connecting as a capability
+#FastMCP SDK uses function name, docstring, and type hints to make tool def/schema, no need to make my own json/yaml schemas for the tool. 
+##RESEARCH LATER: how to format docstring properly - does the formatting improve effectiveness of mcp client, any key wording, or is it not important?
+##understand async/await, network i/o, after this!
 
-
-
-
-# #CODED
-# def format_alert(feature: dict) -> str:
-#     """Format an alert feature into a readable string."""
-#     props = feature["properties"]
-#     return f"""
-# Event: {props.get('event', 'Unknown')}
-# Area: {props.get('areaDesc', 'Unknown')}
-# Severity: {props.get('severity', 'Unknown')}
-# Description: {props.get('description', 'No description available')}
-# Instructions: {props.get('instruction', 'No specific instructions provided')}
-# """
-
-@mcp.tool()
-async def get_alerts(state: str) -> str:
-    """Get weather alerts for a US state.
-
+#Note: async wait combo lets server handle multiple requests at the same time, no blocking, so more efficient and responsive
+##make_nws_request is is an async function involving network I/O
+async def get_alerts(state:str) -> str:
+    """Get weather alerts for a state. 
     Args:
-        state: Two-letter US state code (e.g. CA, NY)
+        state: US State Code with two letters, like WA GA CA NY
     """
+    #API part it's referencing here: https://www.weather.gov/documentation/services-web-api#/default/alerts_active_area 
     url = f"{NWS_API_BASE}/alerts/active/area/{state}"
-    data = await make_nws_request(url)
+    data = await make_nws_request(url) #http request to NWS api, pauses get_alerts execution, resumes once network request complete - NEED TO UNDERSTAND BETTER
 
-    if not data or "features" not in data:
-        return "Unable to fetch alerts or no alerts found."
-
+    if not data or "features" not in data: #error handling for API resp -if data is none, return none (network error, bad status code) #also handles if doesn't have fetures key
+        return "Cannot get alerts, none found here!" #these messages are passed from mcp client to llm/claude, which incorporates it into the natural lang resp to user, so in the chat interface
     if not data["features"]:
         return "No active alerts for this state."
+    
+    alerts = [format_alert(feature) for feature in data["features"]] #list comprehension, goes through each alert object dict within data["features"] list (list of alert dictionaries)
+    #for each feature, calls format_alert function to transform it into nice formatted string
+    return "\n---\n".join(alerts) #new line, three hypens, new line - makes separation btwn diff alerts when being read by llm/displayed to user
+    ##combines individually formatted alert strings into one cohesive formatting string. final string w all formatted alerts is given to mcp client
 
-    alerts = [format_alert(feature) for feature in data["features"]]
-    return "\n---\n".join(alerts)
+
+
+
+
+#Coded
+
+# @mcp.tool()
+# async def get_alerts(state: str) -> str:
+#     """Get weather alerts for a US state.
+
+#     Args:
+#         state: Two-letter US state code (e.g. CA, NY)
+#     """
+#     url = f"{NWS_API_BASE}/alerts/active/area/{state}"
+#     data = await make_nws_request(url)
+
+#     if not data or "features" not in data:
+#         return "Unable to fetch alerts or no alerts found."
+
+#     if not data["features"]:
+#         return "No active alerts for this state."
+
+#     alerts = [format_alert(feature) for feature in data["features"]]
+#     return "\n---\n".join(alerts)
 
 @mcp.tool()
 async def get_forecast(latitude: float, longitude: float) -> str:
