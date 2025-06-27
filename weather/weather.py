@@ -131,20 +131,20 @@ async def get_forecast(latitude: float, longitude:float) -> str: #remember that 
     forecast_data = await make_nws_request(forecast_url) #pausing execution again for network request
     if not forecast_data:
         return "Cannot get detailed forecast :("
+    periods = forecast_data["properties"]["periods"]
 
     #Forecast_dict has a properties key, inside has a key "periods" w list of all dictionaries which each represent a forecast period
-    periods = forecast_data["properties"]["periods"]
-    forecast = []
+    formatted_periods_list = [] # list to append formatted strings to
     for period in periods[:5]: #only shows next 5 periods - limits llm context size by only processing first 5 periods from the list
-        forecast = f"""
+        current_period_string = f""" # Create a string for the current period
     {period['name']}:
     Temperature: {period['temperature']}°{period['temperatureUnit']}
     Wind: {period['windSpeed']} {period['windDirection']}
     Forecast: {period['detailedForecast']}
-    """ #extracts the name of the period, temp, temp unit, wind speed, wind direction, and full narrative forecast
-        forecast.append(forecast) #formats string for the current period and adds to forecast list
-
-    return "\n---\n".join(forecast) #takes list of individual forecast strings (forecast), joins them, combines string to send to mcp client and then llm
+    """
+        formatted_periods_list.append(current_period_string) # Append the string to the list
+    
+    return "\n---\n".join(formatted_periods_list) # Join the list of strings
 
 #Coded
 
