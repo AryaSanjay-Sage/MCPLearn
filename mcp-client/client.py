@@ -154,21 +154,20 @@ class MCPClient: #class that has all logic/state to MCP client application
 
         return "\n".join(final_text) #joins all collected text + tool call msges into single string, separated by newlines, and returns into chatloop
 
-    async def chat_loop(self):
-        """Run an interactive chat loop"""
-        print("\nMCP Client Started!")
+    async def chat_loop(self): #async method implements interactive chat interface
+        """Implements the interactive chat interface loop"""
+        print("\nMCP Client started!")
         print("Type your queries or 'quit' to exit.")
 
-        while True:
-            try:
-                query = input("\nQuery: ").strip()
+        while True: #infinite loop so user can put in multiple queries
+            try: #handles if anything goes wrong lik enetwork issue, claude api error, or tool call unexpected error
+                query = input("\nQuery: ").strip() #prompts user to put in a query, reading line from stdin and .strip() removes any whitespace from beginning or end
 
                 if query.lower() == 'quit':
-                    break
+                    break #case insensitive, if user types in quit ends the chat sesh
 
-                response = await self.process_query(query)
-                print("\n" + response)
-
+                response = await self.process_query(query) #calls process_query method w user input. since process_query is an async method, needs to use await keyword bc needs to be awaited
+                print("\n" + response) #print the response from process_query (which has claude answer and any tool call msges
             except Exception as e:
                 print(f"\nError: {str(e)}")
 
