@@ -18,13 +18,14 @@ load_dotenv()  # load environment variables from .env
 
 print("client.py is running! Imports loaded successfully.")
 
-class MCPClient:
+class MCPClient: #class that has all logic/state to MCP client application
     def __init__(self):
-        # Initialize session and client objects
-        self.session: Optional[ClientSession] = None
-        self.exit_stack = AsyncExitStack()
-        self.anthropic = Anthropic()
-    # methods will go here
+        #Called whenever you make a new instance of MCPClient, or when client = MCPClient()
+        self.session: Optional[ClientSession] = None #Once client successfully connects to MCP server holds the ClientSession object
+        #Optional part is indicating that the type could be ClientSession or None
+        self.exit_stack = AsyncExitStack() #Manages life cycle of async. context managers- when this is called it makes sure that all stack's entered resources get properly shit down
+        self.anthropic = Anthropic() #Makes instance of Anthropic client, which interacts with Anthropic's Claude. 
+        ##NOTED: This automatically looks for that ANTHROPIC_API_KEY environment variable (loaded w load_dotenv()) to authenticate with API
 
     async def connect_to_server(self, server_script_path: str):
         """Connect to an MCP server
