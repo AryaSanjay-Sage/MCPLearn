@@ -1,14 +1,18 @@
-import os
-import sys
-import asyncio
-from typing import Optional
-from contextlib import AsyncExitStack
+import os #gives OS dependent functionality (here, copy environment variables and make file paths)
+import sys #accesses command line arguments and exits the script
+import asyncio #python library for writing concurrent code using async/await syntax. MCP uses asynchronous comm to handle network operations and i/o (RESEARCH THIS)
+from typing import Optional #Used for type hinting
+from contextlib import AsyncExitStack  #research what a context manager is. "async with" W "multiple context managers" -> AsyncExitStack makes sure they're all entered 
+#and exited even if errors occur. This is good because MCP Client session and stdio transport are asynhronous resources need to be carefully shutdown
 
-from mcp import ClientSession, StdioServerParameters
+from mcp import ClientSession, StdioServerParameters #importing the clients connection to the server, handling sending requests and getting responses according to MCP standard
+#defining how the MCP should launch and communication with the server through a different process instead of standard input/output (stdio)
+##RESEARCH: How does the MCP communicate server through that different process? Similarities/differences between that and input/output?
 from mcp.client.stdio import stdio_client
 
-from anthropic import Anthropic
-from dotenv import load_dotenv
+from anthropic import Anthropic #importxs main anthropic client class, lets you interact with Claude models
+##Likely will need to use this since we're using Claude/AWS bedrock!
+from dotenv import load_dotenv #library which helps manage env variables from the .env file
 
 load_dotenv()  # load environment variables from .env
 
