@@ -171,28 +171,28 @@ class MCPClient: #class that has all logic/state to MCP client application
             except Exception as e:
                 print(f"\nError: {str(e)}")
 
-    async def cleanup(self):
+    async def cleanup(self): #async method responsible for shutting down client and releasing resources
         """Clean up resources"""
-        await self.exit_stack.aclose()
+        await self.exit_stack.aclose() #key line for cleanup - closes the standard i/o pipes to server, stops server process, and cleans up mcp client sesh
 
 async def main():
-    if len(sys.argv) < 2:
-        print("Usage: python client.py <path_to_server_script>")
-        sys.exit(1)
-
+    if len(sys.argv) < 2: #sys.argv is a list in python w command line args passed into script. [0] index just has the script name
+        print("Usage: python client.py <path_to_server_script>") #if less than two args provided, (script expects one arg path to serever script), if it's less than 2 then the req server path wasn't given
+        sys.exit(1) #exits script w error code, since 1 indicates error
     client = MCPClient()
     try:
-        print("Attempting to connect to server...") # <-- ADD THIS
-        await client.connect_to_server(sys.argv[1])
-        print("Server connection successful. Starting chat loop...") # <-- ADD THIS
-        await client.chat_loop()
-    except Exception as e: # <-- ADD THIS BLOCK
-        print(f"\nFATAL CLIENT STARTUP ERROR: {str(e)}")
+        print("Trying to connect to server...")
+        await client.connect_to_server(sys.argv[1]) #calls connect_to_server method to get connection to the server
+        ##[1] is the path to the server script - check if there's a [2] or if this only ever has a [0] or [1] index
+        print("Server connection successful. Starting chat loop...")
+        await client.chat_loop() #after connected, this puts in the client into interactive chat loop so they can send queries
+    except Exception as e:
+        print(f"\nFATAL CLIENT STARTUP ERROR: {str(e)}") #prints user friendly error msge
         import traceback
         traceback.print_exc()
     finally:
-        print("Cleaning up resources...") # <-- ADD THIS
-        await client.cleanup()
+        print("Cleaning up resources...")
+        await client.cleanup() #calls cleanup method to make sure all resources are properly closed
 
 if __name__ == "__main__":
     asyncio.run(main())
