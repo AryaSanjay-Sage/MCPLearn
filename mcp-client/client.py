@@ -27,48 +27,56 @@ class MCPClient: #class that has all logic/state to MCP client application
         self.anthropic = Anthropic() #Makes instance of Anthropic client, which interacts with Anthropic's Claude. 
         ##NOTED: This automatically looks for that ANTHROPIC_API_KEY environment variable (loaded w load_dotenv()) to authenticate with API
 
+    #RESEARCH Coroutine (special type of function defined using async def syntax), in async. programming, when coroutine function is called it returns a coroutine object, which is an awaitable object 
     async def connect_to_server(self, server_script_path: str):
-        """Connect to an MCP server
-
+        """Connects to the Multi Client Protocol Server and contains the
+        
         Args:
-            server_script_path: Path to the server script (.py or .js)
+            server_script_path: Holds the path to the .py or .js server script
         """
         is_python = server_script_path.endswith('.py')
         is_js = server_script_path.endswith('.js')
         if not (is_python or is_js):
-            raise ValueError("Server script must be a .py or .js file")
-
-        command = "python" if is_python else "node"
-        # Create a modified environment to include virtual environment path
-        env = os.environ.copy()
+            raise ValueError("The script isn't formatted properly with .py or .js! Fix pls")
+        
+        command = "python" if is_python else "node" #use python or node command based on whether its a py or js file
+        #You either say python + filename or node + filename in the terminal based on the type of file it is
+        env = os.environ.copy() #Makes copy of curr process's env vars so we modify the env for the server subprocess instead of changing the client's own environment
+        ##RESEARCH: Make visual into the client process and server subprocess relationship for better understanding
         venv_site_packages = os.path.join(sys.prefix, 'Lib', 'site-packages')
-        if 'PYTHONPATH' in env:
-            # Use os.pathsep to ensure correct separator (colon on Unix, semicolon on Windows)
-            env['PYTHONPATH'] = f"{venv_site_packages}{os.pathsep}{env['PYTHONPATH']}"
+        #sys.prefix points to .venv or env base directory, lib sitepackages is the standard loc for installed pkges in python windows venv
+        if 'PYTHONPATH' in env: #If the pythonpath alr exists in env copy
+            env['PYTHONPATH'] = f"{venv_site_packages}{os.pathsep}{env['PYTHONPATH']}" #prepends client site-packages path with os.pathsep. 
+            ##Correctly provides path separator for current OS (based on windows/Unix), makes sure server's python interpreter searchs client's venv packages first
+            ##Research os.pathsep to understand!!
         else:
-            env['PYTHONPATH'] = venv_site_packages
-
+            env['PYTHONPATH'] = venv_site_packages #otherwise, sets it to the client's site-packages path
+        
+        #Makes an instance of StdioServerParameters 
         server_params = StdioServerParameters(
-            command=command,
-            args=[server_script_path],
-            env=env # Make sure 'env' is passed here!
-        )
-        server_params = StdioServerParameters(
-            command=command,
-            args=[server_script_path],
-            env=None
+            command=command, #Command to run the server, like "python"
+            args=[server_script_path], #list of arguments passed to command, starting with server script path
+            env=env #passes in modified env with the pythonpath adjustment from earlier! tells mcp to launch server subprocess with this specific env
         )
 
+        #Research asynchronous context managers in python!!
         stdio_transport = await self.exit_stack.enter_async_context(stdio_client(server_params))
+        ##stdio_client takes those params and handles launching the server process and setting up comm standard input/output streams #RESEARCH!!
+        ##enters the stdio_client context manager - basically running the setup code of stdio_client and adding to asyncexitstack
+        ###makes sure that when .aclose() method is called later during cleanup, the stdio client will be properly exited, closing the pipes and stopping the server process
+        ###result is stdio_transport = tuple of (read_stream, write_stream)
         self.stdio, self.write = stdio_transport
+        ##unpacks transport tuple into parts to read/write from/to server
         self.session = await self.exit_stack.enter_async_context(ClientSession(self.stdio, self.write))
+        ##Gives MCP ClientSession instance standard stdio_client I/O streams
+        ###ClientSession is a high-level interface to send MCP requests and receive responses
+        ###await part enters the ClientSession context manager and adds it to the exit stack for proper asynch cleanup
+        await self.session.initialize() #Sends initialize request to MCP server, client/server establish capabilities
 
-        await self.session.initialize()
-
-        # List available tools
+        #after init, client asks and server responses w list of available tools that it exposes (research what "EXPOSES" is referencing)
         response = await self.session.list_tools()
-        tools = response.tools
-        print("\nConnected to server with tools:", [tool.name for tool in tools])
+        tools = response.tools #gets list of tool objects from response #RESEARCH WHAT THESE TOOL OBJECTS LOOK LIKE
+        print("\nConnected to server with tools:", [tool.name for tool in tools]) #prints the names of the tools server advertised, confirming successful connection and tool discovery
 
     async def process_query(self, query: str) -> str:
         """Process a query using Claude and available tools"""
