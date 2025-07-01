@@ -195,4 +195,4 @@ async def main():
         await client.cleanup() #calls cleanup method to make sure all resources are properly closed
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.run(main()) #high level, sets asyncio even loop, runs given coroutine main() until completion, tears down event loop
