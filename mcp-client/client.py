@@ -75,12 +75,12 @@ class MCPClient: #class that has all logic/state to MCP client application
 
         #after init, client asks and server responses w list of available tools that it exposes (research what "EXPOSES" is referencing)
         response = await self.session.list_tools()
-        tools = response.tools #gets list of tool objects from response #RESEARCH WHAT THESE TOOL OBJECTS LOOK LIKE
+        tools = response.tools #gets list of tool objects from response #these are the tools we made in the server code!
         print("\nConnected to server with tools:", [tool.name for tool in tools]) #prints the names of the tools server advertised, confirming successful connection and tool discovery
 
     async def process_query(self, query: str) -> str:
-        """Process a query using Claude and available tools"""
-        messages = [
+        """Using Claude and any other tools that are available, process a query"""
+        messages = [ #Initializes Claude conversation history, each obj defines role (who said it) and content (what was said)
             {
                 "role": "user",
                 "content": query
@@ -88,63 +88,71 @@ class MCPClient: #class that has all logic/state to MCP client application
         ]
 
         response = await self.session.list_tools()
+        #Resource to reference: https://modelcontextprotocol.io/docs/concepts/tools 
         available_tools = [{
-            "name": tool.name,
-            "description": tool.description,
+            "name": tool.name, 
+            "description" : tool.description, 
             "input_schema": tool.inputSchema
-        } for tool in response.tools]
+        } for tool in response.tools] #gets connected MCP server's tools and formats them into list of dictionaries, formatted according to anthropic's message's api tool parameter expectations
+        #https://docs.anthropic.com/en/api/messages
+        #https://docs.aws.amazon.com/bedrock/latest/userguide/model-parameters-anthropic-claude-messages.html 
 
-        # Initial Claude API call
+        #Calls Anthropic's Claude API
         response = self.anthropic.messages.create(
             model="claude-3-5-sonnet-20241022",
-            max_tokens=1000,
-            messages=messages,
-            tools=available_tools
+            max_tokens=1000, #max number of tokens claude can generate in response 
+            ##Interestingly, when you google this it says claude 3.5 sonnet can have a max of 4,096 tokens. Is 1000 better to use for applications to ensure you use less memory? Can play around with this number
+            ###Potential ideas here: cost control (prevents unnecessarily long outputs), latency management (better response time for real-time applications), avoid incomplete responses, more focused and concist
+            messages = messages, #gives current conversation history to claude
+            tools = available_tools #tell claude about functions it can call, claude decides if it needs a tool to answer the query
         )
 
-        # Process response and handle tool calls
-        final_text = []
-
-        assistant_message_content = []
-        for content in response.content:
+        final_text = [] #list to get parts of final response that will get shown to user
+        assistant_manage_content = [] #list to keep all of the assistant's parts of the message (text/tool_use) which get sent back to claude if a tool is used
+        #RESEARCH: What does this 'assistant' exactly mean? Where and how does it relate to the server code?
+        for content in response.content: #in the case when claude just gives a direct text response (doesn't need a tool or is done with tool use)
             if content.type == 'text':
-                final_text.append(content.text)
-                assistant_message_content.append(content)
+                final_text.append(content.text) #adds text to the output list
+                assistant_manage_content.append(content) #adds text content to assistant's turn
+                ##Research into assistant's turn meaning, and what does "more turns needed" means? Is this when LLMs regenerate responses within their response or self correct, or something else?
             elif content.type == 'tool_use':
-                tool_name = content.name
-                tool_args = content.input
-
-                # Execute tool call
-                result = await self.session.call_tool(tool_name, tool_args)
+                tool_name = content.name #name of tool claude wants to call
+                tool_args = content.input #args claude gives for the tool call, like a dictionary
+                result = await self.session.call_tool(tool_name, tool_args) #sends call_tool request to mcp server w claude's tool name & args given by claude
+                ##would execute one of our server's functions, like get_forecast, and result has the output from the server
                 final_text.append(f"[Calling tool {tool_name} with args {tool_args}]")
+                ##adds msge to output that is human readable for transparency to let user know what tool is being called (can see this in claude)
 
-                assistant_message_content.append(content)
-                messages.append({
-                    "role": "assistant",
-                    "content": assistant_message_content
+                assistant_manage_content.append(content) #adds tool_use block (content obj generated by claude, whre it says to answer this i need to run funct X with args Y) to assistants turn 
+                #Tool use content block: https://docs.anthropic.com/en/docs/agents-and-tools/tool-use/implement-tool-use
+                messages.append({ #Assistants turn with tool_use, adds assistance turn to convo history, including tool_use block telling claude what action it took
+                    "role": "assistant", 
+                    "content": assistant_manage_content
                 })
-                messages.append({
-                    "role": "user",
+                messages.append({ #users turn w tool_result - add "tool_result" message to conversation history
+                    # Reference my "intermediary or an agent between the human user and the AI model (Claude) and the MCP server (which provides the tools)" OneNote notes for this part to understand
+                    "role": "user", 
                     "content": [
                     {
-                            "type": "tool_result",
+                            "type": "tool_result", 
                             "tool_use_id": content.id,
                             "content": result.content
                     }
                     ]
                 })
 
-                # Get next response from Claude
-                response = self.anthropic.messages.create(
+                #after tool result, entire convo history (including tool call and result) sent back to claude
+                #claude makes a new response (might be final answer) or another tool call. loop continues until claude gives text response
+                response = self.anthropic.messages.create( 
                     model="claude-3-5-sonnet-20241022",
                     max_tokens=1000,
-                    messages=messages,
+                    messages=messages, 
                     tools=available_tools
                 )
 
-                final_text.append(response.content[0].text)
+                final_text.append(response.content[0].text) #adds in the text from claude's prev response
 
-            return "\n".join(final_text)
+        return "\n".join(final_text) #joins all collected text + tool call msges into single string, separated by newlines, and returns into chatloop
 
     async def chat_loop(self):
         """Run an interactive chat loop"""
