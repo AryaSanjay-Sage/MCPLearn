@@ -40,7 +40,7 @@ class MCPClient: #class that has all logic/state to MCP client application
             raise ValueError("The script isn't formatted properly with .py or .js! Fix pls")
         
         command = "python" if is_python else "node" #use python or node command based on whether its a py or js file
-        #You either say python + filename or node + filename in the terminal based on the type of file it is
+        #You either say python + filename or node + filename in the terminal based on the type of file it is 
         env = os.environ.copy() #Makes copy of curr process's env vars so we modify the env for the server subprocess instead of changing the client's own environment
         ##RESEARCH: Make visual into the client process and server subprocess relationship for better understanding
         venv_site_packages = os.path.join(sys.prefix, 'Lib', 'site-packages')
